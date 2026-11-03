@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Claude Agent Roster</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: left rail = roster of agents (who), center = task board (what), right = export (how to run). Tokens below. */
+:root{
+  --bg:#f3f4f1; --surface:#ffffff; --surface-2:#e9ebe5; --line:#d2d6cc;
+  --fg:#1d221c; --muted:#5f6a5c; --accent:#1f6f5f; --accent-fg:#ffffff; --accent-soft:#d9ece6;
+  --ok:#2e7d4f; --warn:#b26a00; --crit:#b3261e;
+  --font-body:"IBM Plex Sans JP",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15181a; --surface:#1d2124; --surface-2:#252a2e; --line:#353c40;
+    --fg:#e6e9e3; --muted:#9aa49a; --accent:#5fc3a8; --accent-fg:#0f1a16; --accent-soft:#1f3a33;
+    --ok:#6fcf8f; --warn:#e3a53a; --crit:#f07a70; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15181a; --surface:#1d2124; --surface-2:#252a2e; --line:#353c40;
+  --fg:#e6e9e3; --muted:#9aa49a; --accent:#5fc3a8; --accent-fg:#0f1a16; --accent-soft:#1f3a33;
+  --ok:#6fcf8f; --warn:#e3a53a; --crit:#f07a70; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:600}
+h1{font-size:22px}
+h2{font-size:16px}
+h3{font-size:14px}
+p{margin:0}
+a{color:var(--accent)}
+code,kbd,pre,textarea.mono{font-family:var(--font-mono);font-size:12.5px}
+pre{margin:0;white-space:pre;overflow-x:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;padding-block:20px 16px;border-bottom:1px solid var(--line)}
+header.top .sub{color:var(--muted);max-width:60ch}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px}
+button,select,input,textarea{font:inherit;color:inherit}
+button{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button.ghost{background:transparent}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input[type=text],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:5px 8px;width:100%;min-width:0}
+textarea{resize:vertical}
+label.f{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+label.f>span{font-weight:500}
+.chk{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--fg);padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);cursor:pointer}
+.chk input{margin:0}
+.chk:has(input:checked){background:var(--accent-soft);border-color:var(--accent)}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding-block:16px}
+.stat{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:10px 12px}
+.stat b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat span{color:var(--muted);font-size:12px}
+
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+section.panel{display:grid;gap:12px}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.panel-head p{color:var(--muted);font-size:12px}
+
+.agents{display:grid;gap:10px}
+.agent{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px;display:grid;gap:10px;border-left:4px solid var(--c,var(--accent))}
+.agent.lead{background:var(--accent-soft)}
+.agent-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.agent-head input[type=text]{font-weight:600;flex:1 1 140px}
+.agent-head .tag{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.agent-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.tools{display:flex;flex-wrap:wrap;gap:6px}
+.agent .load{font-size:12px;color:var(--muted);display:flex;gap:10px;align-items:center}
+.bar{flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--c,var(--accent))}
+.bar i.over{background:var(--crit)}
+
+.tasks{display:grid;gap:8px}
+.task{display:grid;grid-template-columns:minmax(0,1fr) 150px 120px auto;gap:8px;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:8px 10px}
+@media (max-width:620px){.task{grid-template-columns:1fr 1fr}.task .ttl{grid-column:1/-1}}
+.task .ttl{display:grid;gap:2px}
+.task .ttl input{font-weight:500}
+.task .ttl small{color:var(--muted);font-size:11px;display:flex;gap:6px;flex-wrap:wrap}
+.pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--line)}
+.pill.pending{color:var(--muted)}
+.pill.progress{color:var(--warn);border-color:var(--warn)}
+.pill.done{color:var(--ok);border-color:var(--ok)}
+.pill.blocked{color:var(--crit);border-color:var(--crit)}
+.task .x{padding:4px 8px}
+
+.flow{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px;overflow-x:auto}
+.flow svg{display:block;min-width:520px;width:100%;height:auto;font-family:var(--font-body)}
+.flow text{fill:var(--fg);font-size:12px}
+.flow text.m{fill:var(--muted);font-size:11px}
+.flow .edge{stroke:var(--muted);stroke-width:1.2;fill:none;marker-end:url(#arr)}
+.flow .node{fill:var(--surface-2);stroke:var(--line)}
+
+.export{display:grid;gap:10px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:6px 10px;color:var(--muted)}
+.tabs button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--accent)}
+.export pre{max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:var(--r);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+
+.oss{display:grid;gap:12px;padding-top:28px;border-top:1px solid var(--line);margin-top:28px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:900px;font-size:13px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--surface-2);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.name{font-weight:600;white-space:nowrap}
+td.name small{display:block;font-weight:400;color:var(--muted)}
+.lvl{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.lvl.hi{background:var(--ok)}.lvl.mid{background:var(--warn)}.lvl.lo{background:var(--line)}
+.reco{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.reco article{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px;display:grid;gap:6px}
+.reco article h3{font-size:13px}
+.reco p{font-size:13px;color:var(--muted)}
+.note{font-size:12px;color:var(--muted);max-width:80ch}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <div class="eyebrow">Claude Code / マルチエージェント開発</div>
+    <h1>Claude Agent Roster</h1>
+    <p class="sub">誰(エージェント)に何(タスク)をさせるかをここで決め、Claude Code のエージェントチーム定義や Paperclip の組織図としてそのまま書き出せる配役ボードです。</p>
+  </div>
+  <div class="toolbar">
+    <button id="addAgent" class="primary">エージェントを追加</button>
+    <button id="addTask">タスクを追加</button>
+    <button id="autoAssign">空きに自動配分</button>
+    <button id="reset" class="ghost">サンプルに戻す</button>
+  </div>
+</header>
+
+<div class="stats" id="stats"></div>
+
+<div class="grid">
+  <section class="panel">
+    <div class="panel-head">
+      <h2>エージェント (誰が)</h2>
+      <p>役割・モデル・使えるツール・担当範囲を編集。リードは1人固定。</p>
+    </div>
+    <div class="agents" id="agents"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>タスク (何を)</h2>
+      <p>担当を選ぶとエージェント側の負荷バーに反映されます。</p>
+    </div>
+    <div class="tasks" id="tasks"></div>
+
+    <div class="panel-head" style="margin-top:8px">
+      <h2>委任の流れ</h2>
+      <p>リード → 担当 → レビュー担当 の順にタスクが渡る想定図。</p>
+    </div>
+    <div class="flow" id="flow"></div>
+
+    <div class="panel-head" style="margin-top:8px">
+      <h2>書き出し (どう動かすか)</h2>
+      <p>設定をそのまま各OSSに持ち込める形式で生成します。</p>
+    </div>
+    <div class="export">
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="agents">.claude/agents/*.md</button>
+        <button role="tab" aria-selected="false" data-tab="prompt">Agent Teams 起動プロンプト</button>
+        <button role="tab" aria-selected="false" data-tab="paperclip">Paperclip 組織図 JSON</button>
+        <button role="tab" aria-selected="false" data-tab="orch">orch コマンド</button>
+      </div>
+      <pre id="exportOut"></pre>
+      <div class="toolbar"><button id="copy">クリップボードにコピー</button></div>
+    </div>
+  </section>
+</div>
+
+<section class="oss">
+  <div class="panel-head">
+    <div>
+      <div class="eyebrow">調査結果 (2026年11月時点)</div>
+      <h2>Claude をエージェントとして編成できる OSS ダッシュボード</h2>
+    </div>
+    <p>役割カスタマイズ度: <span class="lvl hi"></span>高 <span class="lvl mid"></span>中 <span class="lvl lo"></span>低/限定</p>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>プロジェクト</th><th>形態</th><th>役割のカスタマイズ</th><th>ダッシュボード</th><th>ライセンス</th><th>導入</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="name"><a href="https://github.com/paperclipai/paperclip">Paperclip</a><small>paperclipai/paperclip · 約110k★</small></td>
+          <td>自己ホスト Web (Node + React)。Claude Code / Codex / Gemini CLI / OpenCode などをアダプタで接続</td>
+          <td><span class="lvl hi"></span>組織図モデル。各エージェントに肩書・役割・上長・ジョブ記述・権限・予算を設定し、階層で委任</td>
+          <td>タスクのチケット化、コスト追跡、承認フロー、定期実行、スキル管理、GitHub連携</td>
+          <td>MIT</td>
+          <td><code>npx paperclipai@latest onboard --yes</code> (Node 24.11+)</td>
+        </tr>
+        <tr>
+          <td class="name"><a href="https://code.claude.com/docs/en/agent-teams">Claude Code Agent Teams</a><small>公式 / 実験的機能</small></td>
+          <td>Claude Code 本体。1セッションがリード、他がチームメイトとして並列動作</td>
+          <td><span class="lvl hi"></span><code>.claude/agents/*.md</code> のサブエージェント定義 (tools / model / effort / 本文) をそのままチームメイトの役割に流用</td>
+          <td>ターミナル内のエージェントパネル、共有タスクリスト、tmux / iTerm2 分割ペイン</td>
+          <td>Claude Code 利用規約</td>
+          <td><code>CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1</code></td>
+        </tr>
+        <tr>
+          <td class="name"><a href="https://github.com/ruvnet/claude-flow">Ruflo (旧 claude-flow)</a><small>ruvnet/claude-flow · 約80k★</small></td>
+          <td>Claude Code 用ハーネス。MCPサーバ / プラグインとして組み込む</td>
+          <td><span class="lvl hi"></span>coder / tester / reviewer / architect など100+の定義済みエージェントと、hierarchical / mesh / adaptive のスウォーム構成</td>
+          <td>Claude Code 内のコンソール (<code>/ruflo</code>) と独立TUI (<code>npx ruflo tui</code>)。Web UIは無し</td>
+          <td>MIT</td>
+          <td><code>npx ruflo@latest init wizard</code></td>
+        </tr>
+        <tr>
+          <td class="name"><a href="https://github.com/OrchestratorInc/agent-orchestrator">Orchestrator.inc</a><small>OrchestratorInc/agent-orchestrator · 約14k★</small></td>
+          <td>デスクトップアプリ (mac / Win / Linux) + スマホアプリ。35+のコーディングエージェント対応</td>
+          <td><span class="lvl mid"></span>オーケストレータ / ワーカー / レビュアーの3役。タスクごとにエージェントとモデルを選択。自由なロール定義は限定的</td>
+          <td>Kanban (Working / Needs you / In review / Ready to merge)、worktree ごとのプレビューブラウザ、プッシュ通知</td>
+          <td>Apache 2.0</td>
+          <td>GitHub Releases からインストーラ</td>
+        </tr>
+        <tr>
+          <td class="name"><a href="https://github.com/jeffdhooton/orch">orch</a><small>jeffdhooton/orch</small></td>
+          <td>Go製 CLI。tmux 上で複数の Claude Code を起動し相互メッセージング</td>
+          <td><span class="lvl hi"></span><code>--role</code> と <code>--spec</code> ファイルで任意の役割を注入 (engineer / pm / reviewer など自由)</td>
+          <td>TUI の <code>orch dash</code>。稼働状態と端末プレビュー、スケジューラ</td>
+          <td>MIT</td>
+          <td><code>go install github.com/jeffdhooton/orch/cmd/orch@latest</code></td>
+        </tr>
+        <tr>
+          <td class="name"><a href="https://github.com/Enderfga/claw-orchestrator">Claw Orchestrator</a><small>Enderfga/claw-orchestrator</small></td>
+          <td>Claude Code などの CLI を永続セッションとしてラップするランタイム</td>
+          <td><span class="lvl mid"></span>Planner / Coder / Reviewer のループが基本。カウンシル (複数エージェント合議) あり</td>
+          <td>組み込み Web ダッシュボード</td>
+          <td>要確認</td>
+          <td>リポジトリの Wiki 参照</td>
+        </tr>
+        <tr>
+          <td class="name"><a href="https://vibekanban.com/">Vibe Kanban</a><small>サンセット中 / コミュニティ保守</small></td>
+          <td>Kanban Web UI。カードを In Progress に動かすと worktree を作りエージェント起動</td>
+          <td><span class="lvl lo"></span>タスク単位でエージェント (Claude Code / Codex 等) を切り替え。役割プロファイルは無し</td>
+          <td>Kanban ボード、差分レビュー</td>
+          <td>Apache 2.0 (要確認)</td>
+          <td><code>npx vibe-kanban</code></td>
+        </tr>
+        <tr>
+          <td class="name"><a href="https://github.com/andyrewlee/awesome-agent-orchestrators">awesome-agent-orchestrators</a><small>一覧 (CC0)</small></td>
+          <td>Claude Command Center、openswarm、Agentrooms、MultiCC、Open Session など40以上の GUI/Web ツールを収録</td>
+          <td colspan="4">上記に当てはまらないときの探索起点。各ツールのライセンスとメンテ状況は個別に確認が必要 (Crystal は2026年2月に非推奨化、1code はアーカイブ済み)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>用途別のおすすめ</h2>
+  <div class="reco">
+    <article>
+      <h3>役割・権限・予算まで GUI で細かく決めたい</h3>
+      <p><strong>Paperclip</strong>。組織図で「誰が誰に報告し、何をしてよいか」を定義でき、Claude Code を含む複数 CLI を混在させられる。このページの「Paperclip 組織図 JSON」タブが下書きになる。</p>
+    </article>
+    <article>
+      <h3>追加ツール無しで Claude Code だけで始めたい</h3>
+      <p><strong>Agent Teams + サブエージェント定義</strong>。役割は <code>.claude/agents/</code> の Markdown に書くだけ。GUI は無いが、このページの「.claude/agents/*.md」タブの出力をそのまま置けば動く。</p>
+    </article>
+    <article>
+      <h3>PR 単位で並列に回して merge まで見たい</h3>
+      <p><strong>Orchestrator.inc</strong>。Kanban でワーカーの状態が一目で分かり、CI 失敗やレビューコメントが担当ワーカーへ自動で戻る。役割の自由度は低め。</p>
+    </article>
+    <article>
+      <h3>tmux で軽量に、役割は自由に</h3>
+      <p><strong>orch</strong>。Go バイナリ1本。<code>--role</code> に好きな役割名、<code>--spec</code> に指示書を渡す方式で、このページの「orch コマンド」タブがそのまま使える。</p>
+    </article>
+  </div>
+  <p class="note">スター数や「サンセット」等の状態は検索時点の各リポジトリ/記事の表示を転記したもので、導入前に本家リポジトリで再確認してください。配役ボードの編集内容はこのブラウザの localStorage にのみ保存されます。</p>
+</section>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+const MODELS=["opus","sonnet","haiku","inherit"];
+const EFFORTS=["low","medium","high"];
+const TOOLS=["Read","Grep","Glob","Edit","Write","Bash","WebSearch","Agent"];
+const COLORS=["#1f6f5f","#3b6fb6","#b26a00","#7a4fb3","#b3261e","#2e7d4f","#8a6d2f"];
+
+const SAMPLE={
+ agents:[
+  {id:"lead",name:"lead",title:"チームリード",model:"opus",effort:"high",tools:["Read","Grep","Glob","Agent"],desc:"タスクを分割して割り当て、成果を統合する。自分では実装しない。",cap:4,lead:true},
+  {id:"architect",name:"architect",title:"アーキテクト",model:"opus",effort:"high",tools:["Read","Grep","Glob","Write"],desc:"設計方針とモジュール境界を決め、docs/ に設計書を書く。",cap:3},
+  {id:"backend",name:"backend-dev",title:"バックエンド実装",model:"sonnet",effort:"medium",tools:["Read","Grep","Glob","Edit","Write","Bash"],desc:"API とデータ層を実装する。担当ファイルは src/server/ 配下のみ。",cap:4},
+  {id:"frontend",name:"frontend-dev",title:"フロントエンド実装",model:"sonnet",effort:"medium",tools:["Read","Grep","Glob","Edit","Write","Bash"],desc:"UI を実装する。担当ファイルは src/web/ 配下のみ。",cap:4},
+  {id:"tester",name:"test-runner",title:"テスト担当",model:"sonnet",effort:"medium",tools:["Read","Grep","Glob","Write","Bash"],desc:"テストを書き、CI を通す。既存テストの無効化は禁止。",cap:5},
+  {id:"reviewer",name:"security-reviewer",title:"レビュー / セキュリティ",model:"opus",effort:"high",tools:["Read","Grep","Glob"],desc:"差分をレビューし、脆弱性と設計逸脱を指摘する。編集はしない。",cap:6}
+ ],
+ tasks:[
+  {id:1,title:"ユーザー認証 API の設計",assignee:"architect",reviewer:"reviewer",status:"done",deps:[]},
+  {id:2,title:"JWT 発行と検証の実装",assignee:"backend",reviewer:"reviewer",status:"progress",deps:[1]},
+  {id:3,title:"ログイン画面の実装",assignee:"frontend",reviewer:"reviewer",status:"progress",deps:[1]},
+  {id:4,title:"認証フローの結合テスト",assignee:"tester",reviewer:"",status:"pending",deps:[2,3]},
+  {id:5,title:"セッション失効の仕様検討",assignee:"",reviewer:"",status:"pending",deps:[]},
+  {id:6,title:"レート制限ミドルウェア",assignee:"backend",reviewer:"reviewer",status:"pending",deps:[2]}
+ ]
+};
+
+let state=load();
+let tab="agents";
+const $=s=>document.querySelector(s);
+
+function load(){try{const s=localStorage.getItem("roster-v1");if(s)return JSON.parse(s);}catch(e){}return JSON.parse(JSON.stringify(SAMPLE));}
+function save(){try{localStorage.setItem("roster-v1",JSON.stringify(state));}catch(e){}}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function agentById(id){return state.agents.find(a=>a.id===id);}
+function loadOf(id){return state.tasks.filter(t=>t.assignee===id&&t.status!=="done").length;}
+function isBlocked(t){return t.status!=="done"&&t.deps.some(d=>{const p=state.tasks.find(x=>x.id===d);return p&&p.status!=="done";});}
+
+function render(){renderStats();renderAgents();renderTasks();renderFlow();renderExport();save();}
+
+function renderStats(){
+  const open=state.tasks.filter(t=>t.status!=="done").length;
+  const un=state.tasks.filter(t=>!t.assignee&&t.status!=="done").length;
+  const bl=state.tasks.filter(isBlocked).length;
+  const over=state.agents.filter(a=>loadOf(a.id)>a.cap).length;
+  $("#stats").innerHTML=[
+    [state.agents.length,"エージェント"],[open,"未完了タスク"],[un,"未割当"],[bl,"依存待ち"],[over,"容量超過の担当"]
+  ].map(([n,l])=>`<div class="stat"><b>${n}</b><span>${l}</span></div>`).join("");
+}
+
+function renderAgents(){
+  $("#agents").innerHTML=state.agents.map((a,i)=>{
+    const c=COLORS[i%COLORS.length], l=loadOf(a.id), pct=Math.min(100,Math.round(l/Math.max(1,a.cap)*100));
+    return `<div class="agent${a.lead?" lead":""}" style="--c:${c}" data-id="${a.id}">
+      <div class="agent-head">
+        <input type="text" id="n-${a.id}" data-f="name" value="${esc(a.name)}" aria-label="エージェント名 (英数字)" pattern="[a-z0-9-]+">
+        <span class="tag">${a.lead?"team lead":"teammate"}</span>
+        ${a.lead?"":`<button class="ghost x" data-del="${a.id}" aria-label="削除">削除</button>`}
+      </div>
+      <div class="agent-row">
+        <label class="f"><span>肩書</span><input type="text" id="t-${a.id}" data-f="title" value="${esc(a.title)}"></label>
+        <label class="f"><span>モデル</span><select id="m-${a.id}" data-f="model">${MODELS.map(m=>`<option${m===a.model?" selected":""}>${m}</option>`).join("")}</select></label>
+        <label class="f"><span>effort</span><select id="e-${a.id}" data-f="effort">${EFFORTS.map(m=>`<option${m===a.effort?" selected":""}>${m}</option>`).join("")}</select></label>
+        <label class="f"><span>同時タスク上限</span><input type="text" id="c-${a.id}" data-f="cap" inputmode="numeric" value="${a.cap}"></label>
+      </div>
+      <label class="f"><span>担当範囲 / 指示 (定義ファイルの本文になります)</span><textarea id="d-${a.id}" data-f="desc" rows="2">${esc(a.desc)}</textarea></label>
+      <div class="tools">${TOOLS.map(t=>`<label class="chk"><input type="checkbox" id="tool-${a.id}-${t}" data-tool="${t}"${a.tools.includes(t)?" checked":""}>${t}</label>`).join("")}</div>
+      <div class="load"><span>負荷 ${l}/${a.cap}</span><div class="bar"><i class="${l>a.cap?"over":""}" style="width:${pct}%"></i></div></div>
+    </div>`;
+  }).join("");
+}
+
+function renderTasks(){
+  const opts=sel=>`<option value="">— 未割当 —</option>`+state.agents.filter(a=>!a.lead).map(a=>`<option value="${a.id}"${a.id===sel?" selected":""}>${esc(a.name)}</option>`).join("");
+  $("#tasks").innerHTML=state.tasks.map(t=>{
+    const st=isBlocked(t)?"blocked":t.status;
+    const lbl={pending:"待機",progress:"作業中",done:"完了",blocked:"依存待ち"}[st];
+    return `<div class="task" data-id="${t.id}">
+      <div class="ttl"><input type="text" id="tt-${t.id}" data-f="title" value="${esc(t.title)}" aria-label="タスク名">
+        <small><span class="pill ${st}">${lbl}</span>${t.deps.length?`<span>依存: #${t.deps.join(", #")}</span>`:""}<span>#${t.id}</span></small></div>
+      <label class="f"><span>担当</span><select id="as-${t.id}" data-f="assignee">${opts(t.assignee)}</select></label>
+      <label class="f"><span>レビュー</span><select id="rv-${t.id}" data-f="reviewer">${opts(t.reviewer)}</select></label>
+      <div class="toolbar"><button data-cycle="${t.id}" title="状態を進める">${t.status==="done"?"再開":t.status==="progress"?"完了":"開始"}</button><button class="ghost x" data-delt="${t.id}" aria-label="削除">×</button></div>
+    </div>`;
+  }).join("");
+}
+
+function renderFlow(){
+  const lead=state.agents.find(a=>a.lead)||state.agents[0];
+  const workers=state.agents.filter(a=>!a.lead);
+  const W=620, rowH=46, H=Math.max(120, workers.length*rowH+40);
+  const leadY=H/2;
+  const nodes=workers.map((a,i)=>{
+    const y=30+i*rowH, cnt=loadOf(a.id), rv=state.tasks.filter(t=>t.reviewer===a.id&&t.status!=="done").length;
+    return `<path class="edge" d="M150 ${leadY} C 220 ${leadY}, 220 ${y}, 290 ${y}"/>
+      <rect class="node" x="290" y="${y-14}" width="190" height="28" rx="4"/>
+      <text x="300" y="${y+4}">${esc(a.name)}</text>
+      <text class="m" x="490" y="${y+4}">${cnt} 件担当${rv?` / ${rv} 件レビュー`:""}</text>`;
+  }).join("");
+  $("#flow").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="リードから各担当への委任図">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="currentColor" style="color:var(--muted)"/></marker></defs>
+    <rect class="node" x="20" y="${leadY-16}" width="130" height="32" rx="4"/>
+    <text x="30" y="${leadY+4}">${esc(lead?lead.name:"lead")}</text>
+    <text class="m" x="30" y="${leadY+30}">分割・割当・統合</text>
+    ${nodes}
+  </svg>`;
+}
+
+function buildAgentsMd(){
+  return state.agents.filter(a=>!a.lead).map(a=>
+`# .claude/agents/${a.name}.md
+---
+name: ${a.name}
+description: ${a.title}。${a.desc.split("。")[0]}。
+tools: ${a.tools.join(", ")}
+model: ${a.model}
+effort: ${a.effort}
+---
+あなたは ${a.title} (${a.name}) です。
+${a.desc}
+担当タスクが終わったら共有タスクリストの次の未割当タスクを自分で取ること。
+担当外のファイルは編集しない。
+`).join("\n");
+}
+function buildPrompt(){
+  const ws=state.agents.filter(a=>!a.lead);
+  const lines=ws.map(a=>`- ${a.name} (${a.title}, ${a.model}): ${a.desc}`);
+  const tasks=state.tasks.filter(t=>t.status!=="done").map(t=>{
+    const who=t.assignee?agentById(t.assignee).name:"未割当 (リードが判断)";
+    const rv=t.reviewer?` / レビュー: ${agentById(t.reviewer).name}`:"";
+    const dep=t.deps.length?` / 依存: #${t.deps.join(", #")}`:"";
+    return `- #${t.id} ${t.title} → 担当: ${who}${rv}${dep}`;
+  });
+  return `# 事前準備
+# settings.json に {"env":{"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS":"1"}} を設定
+# 上のタブの .claude/agents/*.md を配置してから、リードのセッションに以下を貼る
+
+次のチームメイトを、それぞれ対応するサブエージェント定義 (agent type) を使って起動してください。
+名前は定義どおりに付けること。
+${lines.join("\n")}
+
+共有タスクリストに以下を作成し、担当を割り当ててください。依存関係はそのまま設定すること。
+${tasks.join("\n")}
+
+リードであるあなたは自分で実装せず、全員が終わるまで待ってから成果を統合して報告してください。`;
+}
+function buildPaperclip(){
+  const lead=state.agents.find(a=>a.lead);
+  const agents=state.agents.map(a=>({
+    name:a.name,title:a.title,role:a.lead?"executive":"individual_contributor",
+    reportsTo:a.lead?null:(lead?lead.name:null),
+    adapter:"claude_code",adapterConfig:{model:a.model,effort:a.effort,allowedTools:a.tools},
+    jobDescription:a.desc,budget:{monthlyUsd:a.lead?100:50,maxConcurrentTasks:a.cap}
+  }));
+  const issues=state.tasks.map(t=>({id:`T-${t.id}`,title:t.title,assignee:t.assignee?agentById(t.assignee).name:null,reviewer:t.reviewer?agentById(t.reviewer).name:null,status:t.status,blockedBy:t.deps.map(d=>`T-${d}`)}));
+  return "// Paperclip のインポート形式は公式ドキュメントで確認してください。下記は組織図とチケットの下書きです。\n"+JSON.stringify({company:"my-dev-team",agents,issues},null,2);
+}
+function buildOrch(){
+  const out=["orch init"];
+  state.agents.filter(a=>!a.lead).forEach(a=>{
+    out.push(`cat > specs/${a.name}.md <<'EOF'\nあなたは ${a.title} です。${a.desc}\nEOF`);
+    out.push(`orch up ${a.name} --role ${a.title.replace(/\s+/g,"-")} --dir ~/projects/myapp --spec specs/${a.name}.md`);
+  });
+  state.tasks.filter(t=>t.assignee&&t.status!=="done").forEach(t=>out.push(`orch send ${agentById(t.assignee).name} "#${t.id} ${t.title}"`));
+  out.push("orch dash");
+  return out.join("\n");
+}
+function renderExport(){
+  const f={agents:buildAgentsMd,prompt:buildPrompt,paperclip:buildPaperclip,orch:buildOrch}[tab];
+  $("#exportOut").textContent=f();
+}
+
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),1800);}
+
+/* events */
+document.addEventListener("input",e=>{
+  const el=e.target, card=el.closest(".agent"), row=el.closest(".task");
+  if(card){
+    const a=agentById(card.dataset.id);
+    if(el.dataset.tool){a.tools=TOOLS.filter(t=>card.querySelector(`[data-tool="${t}"]`).checked);renderExport();save();return;}
+    const f=el.dataset.f; if(!f)return;
+    if(f==="cap"){a.cap=Math.max(1,parseInt(el.value,10)||1);}
+    else if(f==="name"){a.name=el.value.toLowerCase().replace(/[^a-z0-9-]/g,"-");}
+    else a[f]=el.value;
+    if(f==="cap"||f==="name"){renderStats();renderTasks();renderFlow();}
+    renderExport();save();return;
+  }
+  if(row){
+    const t=state.tasks.find(x=>x.id==row.dataset.id), f=el.dataset.f; if(!f)return;
+    t[f]=el.value;
+    if(f==="assignee"||f==="reviewer"){render();}else{renderExport();save();}
+  }
+});
+document.addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  if(b.dataset.del){state.agents=state.agents.filter(a=>a.id!==b.dataset.del);state.tasks.forEach(t=>{if(t.assignee===b.dataset.del)t.assignee="";if(t.reviewer===b.dataset.del)t.reviewer="";});render();}
+  else if(b.dataset.delt){state.tasks=state.tasks.filter(t=>t.id!=b.dataset.delt);state.tasks.forEach(t=>t.deps=t.deps.filter(d=>d!=b.dataset.delt));render();}
+  else if(b.dataset.cycle){const t=state.tasks.find(x=>x.id==b.dataset.cycle);t.status={pending:"progress",progress:"done",done:"pending"}[t.status];render();}
+  else if(b.dataset.tab){tab=b.dataset.tab;document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));renderExport();}
+});
+$("#addAgent").onclick=()=>{const n=state.agents.length;state.agents.push({id:"a"+Date.now(),name:"agent-"+n,title:"新しい役割",model:"sonnet",effort:"medium",tools:["Read","Grep","Glob"],desc:"担当範囲をここに書く。",cap:3});render();};
+$("#addTask").onclick=()=>{const id=Math.max(0,...state.tasks.map(t=>t.id))+1;state.tasks.push({id,title:"新しいタスク",assignee:"",reviewer:"",status:"pending",deps:[]});render();$(`#tt-${id}`)?.focus();};
+$("#autoAssign").onclick=()=>{
+  let n=0;
+  state.tasks.filter(t=>!t.assignee&&t.status!=="done").forEach(t=>{
+    const free=state.agents.filter(a=>!a.lead&&loadOf(a.id)<a.cap).sort((a,b)=>(loadOf(a.id)/a.cap)-(loadOf(b.id)/b.cap))[0];
+    if(free){t.assignee=free.id;n++;}
+  });
+  render();toast(n?`${n} 件を割り当てました`:"空きのある担当がありません");
+};
+$("#reset").onclick=()=>{state=JSON.parse(JSON.stringify(SAMPLE));render();toast("サンプルに戻しました");};
+$("#copy").onclick=()=>{
+  const txt=$("#exportOut").textContent;
+  const fallback=()=>{const r=document.createRange();r.selectNodeContents($("#exportOut"));const s=getSelection();s.removeAllRanges();s.addRange(r);toast("選択しました。Ctrl/Cmd+C でコピーしてください");};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>toast("コピーしました"),fallback);}else fallback();
+};
+render();
+})();
+</script>
+</body>
+</html>
